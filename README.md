@@ -18,7 +18,7 @@ nextflow run . -profile singularity,slurm -params-file params.yaml
 nfcore_dir: /path/to/nfcore_smrnaseq/results
 metadata:   metadata.csv
 contrasts:  contrasts.csv
-outdir:     results_smrna
+outdir:     results
 ```
 
 Generic templates are in `assets/`; a working example is in `demo/batch_2026_04/`.
@@ -77,15 +77,30 @@ Set `three_prime_adapter` in the nf-core run to the adapter of your kit. A wrong
 
 ## Outputs
 
+The run writes three trees under `outdir` (`results/` by default):
+
+- `deliverables/` — tables and figures for the wet lab.
+- `raw/` — native per-tool dumps kept for internal audit; not needed to read the results.
+- `run_info/` — validated inputs, parameters, thresholds and the Nextflow `pipeline_info/`.
+
 ```
-results_smrna/
-├── 00_audit/     validation report
-├── 01_counts/    miRNA count matrices
-├── 02_qc/        QC table, flags, composition
-├── 03_explore/   PCA and sample distances
-├── 04_de/        DESeq2 results per run and contrast
-├── 05_biotype/   optional
-├── 06_isomir/    optional
-├── 07_functional/ optional
-└── report/       smrna_report.html
+results/
+├── deliverables/
+│   ├── README.md      what to open and the column dictionary
+│   ├── counts/        miRNA count matrices
+│   ├── qc/            QC table, flags, composition
+│   ├── explore/       PCA and sample distances (per norm_group)
+│   ├── de/            DESeq2 results per contrast: de_full.tsv, de_significant.tsv
+│   ├── biotype/       optional (phase 2)
+│   ├── isomir/        optional (phase 3)
+│   ├── functional/    optional (phase 3)
+│   └── report/        smrna_report.html
+├── raw/               native dumps for internal audit
+│   ├── counts/        counts_mature.tsv, isomir_filtered.tsv.gz
+│   ├── deseq2/        dds.rds, size_factors, filtered_counts, sensitivity runs
+│   └── biotype/       alignment_stats, feature_counts
+└── run_info/          audit.md, validated metadata, params_used, thresholds_used
+    └── pipeline_info/ params.json, execution_report.html, execution_trace.txt
 ```
+
+Each contrast ships `de_full.tsv` (everything tested) and `de_significant.tsv` (`padj < alpha`). Sensitivity runs (`sens_mature`, `sens_no_flagged`, `sens_batch`) and intermediate objects stay in `raw/`.

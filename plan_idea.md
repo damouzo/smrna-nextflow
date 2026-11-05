@@ -4,7 +4,7 @@
 
 ## 1. Alcance
 
-**Contrato:** entrada = carpeta `results/` de nf-core/smrnaseq + `metadata.csv` + `contrasts.csv`; salida = carpeta `results_smrna/` con tablas, figuras e informe HTML.
+**Contrato:** entrada = carpeta `results/` de nf-core/smrnaseq (`nfcore_dir`) + `metadata.csv` + `contrasts.csv`; salida = carpeta `results/` (`outdir`, por defecto dentro de la carpeta del pipeline `smrna_nextflow/`) con tres ramas: `deliverables/` (tablas y figuras para compartir con el wet lab), `raw/` (volcados nativos para auditoría interna) y `run_info/` (parámetros, umbrales y metadatos del run).
 
 | Fase | Qué hace |
 | --- | --- |
@@ -52,7 +52,7 @@ Marcados **[verificado]** los comprobados sobre los datos al revisar este plan. 
 | D6 | Las muestras marcadas por QC no se excluyen; el DE se repite sin ellas como sensibilidad. | Evitar exclusiones silenciosas |
 | D7 | Composición por biotipo en dos niveles: mirTrace (fase 1) y completa por alineamiento (fase 2). | Empezar simple |
 | D8 | **Referencias grandes por ruta, nunca descargadas por el pipeline.** El README explica cómo descargar cada una con `wget`; el usuario pone la ruta en `params.yaml` o en `nextflow.config`. | Reproducibilidad y simplicidad |
-| D9 | Semilla fija (`seed = 42`). Versiones y parámetros se vuelcan a `pipeline_info/`. | Reproducibilidad |
+| D9 | Semilla fija (`seed = 42`). Versiones y parámetros se vuelcan a `run_info/pipeline_info/`. | Reproducibilidad |
 | D10 | **miRBase 23.1 fijada por ruta**, nunca por URL `CURRENT`: `mature`, `hairpin` y `mirna_gtf` apuntan a `data/reference/genome/GRCh38/mirbase/v23.1/` (ya descargada, con README y md5). Para actualizar en el futuro se descarga la nueva release en `mirbase/vX.Y/` y se cambian las tres rutas. La 22.1 no es viable como juego completo: no hay `hsa.gff3` de esa versión. | H7. Los nombres cambian respecto al run de abril y puede que respecto a miRTarBase (no verificado): M8 lista los miRNAs no emparejados. |
 
 ## 4. Entradas
@@ -139,14 +139,14 @@ Qué aporta cada pieza: nf-core cuantifica solo miRNA (mirtop). snoRNA, tRNA, rR
 
 ## 5. Parámetros
 
-Todos tienen valor por defecto en `nextflow.config` y se vuelcan a `pipeline_info/params.json`. Un umbral no puede estar escrito dentro de un script.
+Todos tienen valor por defecto en `nextflow.config` y se vuelcan a `run_info/pipeline_info/params.json`. Un umbral no puede estar escrito dentro de un script.
 
 **Por ejecución** (`params.yaml`):
 
 | Parámetro | Default | Descripción |
 | --- | --- | --- |
 | `nfcore_dir`, `metadata`, `contrasts` | obligatorios | Entradas |
-| `outdir` | `results_smrna` | Salida |
+| `outdir` | `results` | Salida; contiene `deliverables/`, `raw/` y `run_info/` |
 | `batch_col` | null | Columna de `metadata` para la ejecución `sens_batch` |
 | `run_biotype`, `run_isomir`, `run_functional` | false | Activan las fases 2 y 3 |
 
@@ -234,7 +234,7 @@ Fase 3:                              M7 isomiRs   M8 funcional
   2. Leer `pipeline_info/params_*.json` y avisar (no fallar) si el adaptador declarado difiere de `expected_adapter`, si `with_umi` o `filter_contamination` son true, o si `mature`, `hairpin` y `mirna_gtf` no están en la misma carpeta (o son URL o `test-datasets`). Las tres rutas, que llevan la versión de miRBase, se anotan en `audit.md`.
   3. Mirar el último nt de los reads de un FASTA colapsado; si más del 90 % termina en la misma base, avisar de resto de adaptador (H2).
   4. Validar `metadata.csv` (columnas obligatorias, `sample_id` únicos, todas las muestras presentes en los conteos y ninguna sobrante) y `contrasts.csv` (sección 4.3).
-- **Salida** (`00_audit/`): `audit.md` (versión de nf-core, genoma, adaptador, avisos, nº de muestras por condición y grupo), `metadata_validated.csv`, `contrasts_validated.csv`.
+- **Salida** (`run_info/`): `audit.md` (versión de nf-core, genoma, adaptador, avisos, nº de muestras por condición y grupo), `metadata_validated.csv`, `contrasts_validated.csv`.
 - **Falla** si faltan ficheros, no casan las muestras o un contraste es inválido.
 
 ### M1 · `build_counts.R` (fase 1)
@@ -246,7 +246,7 @@ Fase 3:                              M7 isomiRs   M8 funcional
   3. k = nº de miRNAs distintos por UID tras el filtrado; peso 1/k; conteo(muestra, miRNA) = suma de peso × conteo; redondeo a entero.
 - **Hace (fuente mature):** leer `mature_counts.csv`, trasponer y ordenar por `metadata`.
 - **Qc table:** fusiona fastp, mirTrace, samtools, totales de mirtop y metadata.
-- **Salida:** `01_counts/counts_mirtop.tsv` (miRNA × muestra, enteros, columnas en el orden de `metadata`), `counts_mature.tsv`, `isomir_filtered.tsv.gz` (filas supervivientes con su peso) y `02_qc/qc_table.tsv` con `sample_id, condition, norm_group, exp, reads_raw, reads_passed_fastp, pct_passed, mirtrace_pct_miRNA, mirtrace_pct_tRNA, mirtrace_pct_rRNA, mirtrace_pct_artifact, mirtrace_pct_unknown, mirtop_raw_total, mirna_reads_mirtop, mature_total, canonical_frac, multi_assigned_frac, genome_mapped_pct`.
+- **Salida:** `deliverables/counts/counts_mirtop.tsv` (miRNA × muestra, enteros, columnas en el orden de `metadata`) y `deliverables/qc/qc_table.tsv` con `sample_id, condition, norm_group, exp, reads_raw, reads_passed_fastp, pct_passed, mirtrace_pct_miRNA, mirtrace_pct_tRNA, mirtrace_pct_rRNA, mirtrace_pct_artifact, mirtrace_pct_unknown, mirtop_raw_total, mirna_reads_mirtop, mature_total, canonical_frac, multi_assigned_frac, genome_mapped_pct`. Los volcados de sensibilidad van a `raw/counts/`: `counts_mature.tsv` e `isomir_filtered.tsv.gz` (filas supervivientes con su peso).
 - Los miRNAs de `mature` que no casan por nombre con mirtop se listan en el log, no son un error.
 
 ### M2 · `qc_composition.R` (fase 1)
@@ -254,7 +254,7 @@ Fase 3:                              M7 isomiRs   M8 funcional
 - **Entrada:** `qc_table.tsv`, metadata y contrasts.
 - **Flags** (se marcan, no se excluyen): LOW_MIRNA_FRAC, HIGH_TRNA_FRAC, HIGH_RRNA_FRAC y LOW_DEPTH.
 - **Composición mirTrace:** % de miRNA, rRNA, tRNA, artifact y unknown por muestra; por contraste, media por condición y Δ en puntos porcentuales (descriptivo, sin test).
-- **Salida** (`02_qc/`): `qc_flags.tsv` (`sample_id, flag, value, threshold`), `flagged_samples.txt`, `qc_overview.pdf/png`, `composition_by_sample.tsv`, `composition_delta.tsv` (`contrast_id, category, mean_ref, mean_trt, delta_pp`), `composition_stacked_bar.pdf`.
+- **Salida** (`deliverables/qc/`): `qc_flags.tsv` (`sample_id, flag, value, threshold`), `flagged_samples.txt`, `qc_overview.pdf/png`, `composition_by_sample.tsv`, `composition_delta.tsv` (`contrast_id, category, mean_ref, mean_trt, delta_pp`), `composition_stacked_bar.pdf`.
 
 ### M3 · `deseq2_group.R` (fase 1)
 
@@ -266,20 +266,20 @@ Un proceso por `norm_group` (más uno `all` sin DE con todas las muestras) y eje
   2. DESeqDataSet; size factors con `ratio` y paso automático a `poscounts` si falla; `DESeq` con `fitType` paramétrico y paso a `local` o `mean` si falla (se registra).
   3. Solo en `main`: VST con `blind = TRUE`, PCA con los `n_top_var` miRNAs más variables (color `condition`, forma `exp`, muestras con flag resaltadas) y mapa de calor de distancias entre muestras.
   4. Por contraste: `results()` y `lfcShrink(type = shrink_type)`; `direction` = up, down o ns (por `alpha` y signo del log2FC); `strong` si |log2FC| ≥ `lfc_flag`.
-- **Salida:** `03_explore/GRUPO/` (`pca.pdf`, `pca_coords.tsv`, `sample_distance_heatmap.pdf`, `size_factors.tsv`, `filtered_counts.tsv`) y `04_de/RUN/CONTRAST_ID/` (`de_results.tsv`, `volcano.pdf`).
-- **Columnas de `de_results.tsv`:** `mirna, baseMean, log2FC_mle, log2FC_shrunk, lfcSE, stat, pvalue, padj, direction, strong, n_ref, n_trt, mean_norm_count_ref, mean_norm_count_trt`.
+- **Salida:** `deliverables/explore/GRUPO/` (`pca.pdf`, `pca_coords.tsv`, `sample_distance_heatmap.pdf`); `deliverables/de/CONTRAST_ID/` (`de_full.tsv`, `de_significant.tsv`, `volcano.pdf`) para `main`. Las sensibilidades van a `raw/deseq2/RUN/CONTRAST_ID/de_full.tsv` y `de_significant.tsv`; `size_factors.tsv`, `filtered_counts.tsv` y `dds.rds` a `raw/deseq2/GRUPO/`.
+- **Columnas de `de_full.tsv`:** `mirna, baseMean, log2FC_mle, log2FC_shrunk, lfcSE, stat, pvalue, padj, direction, strong, n_ref, n_trt, mean_norm_count_ref, mean_norm_count_trt`. `de_significant.tsv` es el subconjunto con `padj < alpha` (mismas columnas).
 
 ### M4 · `summarize_de.R` (fase 1)
 
-- **Salida** (`04_de/`): `de_summary.tsv` (`run, contrast_id, n_tested, n_up, n_down, n_strong`) y `concordance.tsv` (`contrast_id, run_a, run_b, n_common, spearman_log2fc, n_sig_shared`), `main` frente a cada sensibilidad.
+- **Salida** (`deliverables/de/`): `de_summary.tsv` (`run, contrast_id, n_tested, n_up, n_down, n_strong`) y `concordance.tsv` (`contrast_id, run_a, run_b, n_common, spearman_log2fc, n_sig_shared`), `main` frente a cada sensibilidad.
 
 ### M5 · `report.Rmd` (fase 1, crece por fases)
 
-Informe HTML que solo lee `results_smrna/` y falla si falta un fichero de las fases activas. Secciones: resumen, auditoría, QC y flags, composición, PCA, DE por contraste con concordancia, isomiRs y funcional (si existen), métodos y limitaciones.
+Informe HTML que solo lee `outdir` (`deliverables/` y `run_info/`) y falla si falta un fichero de las fases activas. Secciones: resumen, auditoría, QC y flags, composición, PCA, DE por contraste con concordancia, isomiRs y funcional (si existen), métodos y limitaciones.
 
 Limitaciones (texto fijo): los porcentajes de composición son relativos; el DE es relativo al total de miRNA, no absoluto; solo se capturan fragmentos de snoRNA (H9); n pequeño.
 
-**Salida:** `report/smrna_report.html`.
+**Salida:** `deliverables/report/smrna_report.html`.
 
 ### M6 · `biotype_full.R` (fase 2, `run_biotype`)
 
@@ -290,7 +290,7 @@ Limitaciones (texto fijo): los porcentajes de composición son relativos; el DE 
   3. `bedtools intersect -wo -s -f min_overlap_frac` (misma hebra). Sin feature solapada: `unannotated`.
   4. Clase de mayor prioridad entre las solapadas; empate: `feature_id` alfabético. Una secuencia de tamaño n con N loci aporta n/N a cada locus.
   5. Para cada clase de `de_classes`, matriz feature × muestra (tRNA por anticodón) y DE con `deseq2_group.R`.
-- **Salida** (`05_biotype/`): `alignment_stats.tsv`, `biotype_counts.tsv`, `biotype_composition.tsv`, `composition_delta.tsv`, `composition_stacked_bar.pdf`, `feature_counts/CLASE.tsv` y `de/CLASE/CONTRAST_ID/de_results.tsv`.
+- **Salida** (`deliverables/biotype/`): `biotype_counts.tsv`, `biotype_composition.tsv`, `composition_delta.tsv`, `composition_stacked_bar.pdf` y `de/CLASE/CONTRAST_ID/{de_full.tsv, de_significant.tsv}`. Los volcados nativos `alignment_stats.tsv` y `feature_counts/CLASE.tsv` van a `raw/biotype/`.
 - **Advertencia para el informe:** los porcentajes son composicionales; interpretar junto a los conteos absolutos. Los DE de clases con pocas features son exploratorios.
 
 ### M7 · `isomir_profile.R` (fase 3, `run_isomir`)
@@ -299,41 +299,61 @@ Un isomiR es un read de un miRNA que difiere de la secuencia canónica de miRBas
 
 - **Entrada:** `isomir_filtered.tsv.gz`, metadata, contrasts. **Requiere lecturas con el 3' bien recortado (D1).**
 - **Hace:** por muestra y miRNA con al menos `isomir_min_reads`, fracciones canónica, con desplazamiento 5', con desplazamiento 3' y con adición 3', e isoforma dominante. Por contraste, cambio de `frac_5p_shifted` (t de Welch sobre logit, indicativo). Matriz de isomiRs (miRNA + iso_5p:iso_3p:iso_add3p) y DE con `deseq2_group.R`.
-- **Salida** (`06_isomir/`): `isomir_profile_by_sample.tsv`, `isomir_counts.tsv`, `de_isomir/CONTRAST_ID/de_results.tsv`, `delta_5p_shift_CONTRAST_ID.tsv` y figuras.
+- **Salida** (`deliverables/isomir/`): `isomir_profile_by_sample.tsv`, `isomir_counts.tsv`, `de_isomir/CONTRAST_ID/{de_full.tsv, de_significant.tsv}`, `delta_5p_shift_CONTRAST_ID.tsv` y figuras.
 
 ### M8 · `functional.R` (fase 3, `run_functional`)
 
-- **Entrada:** `de_results.tsv` de `main` y `mirtarbase_file`.
+- **Entrada:** `de_full.tsv` de `main` y `mirtarbase_file`.
 - **Hace:** targets validados de `species`, casados por nombre de miRNA. Por contraste y dirección, con al menos `min_sig_mirnas` significativos, enriquecimiento GO BP con clusterProfiler; el universo son los genes con algún target validado de un miRNA expresado.
-- **Salida** (`07_functional/CONTRAST_ID/`): `targets.tsv`, `ora_up.tsv`, `ora_down.tsv`.
+- **Salida** (`deliverables/functional/CONTRAST_ID/`): `targets.tsv`, `ora_up.tsv`, `ora_down.tsv`.
 
 ## 9. Estructura de salida
 
+Todos los productos viven bajo `outdir` (`results/` por defecto), organizados en tres ramas: `deliverables/` (lo que se comparte con el wet lab), `raw/` (volcados nativos para auditoría interna) y `run_info/` (parámetros y metadatos del run). En este proyecto el `outdir` vive en `analysis/smRNAseq/batch_2026_04/smrna_nextflow/`, aparte del run de nf-core (`nfcore_smrnaseq/results/`).
+
 ```
-results_smrna/
-├── 00_audit/      audit.md, metadata_validated.csv, contrasts_validated.csv
-├── 01_counts/     counts_mirtop.tsv, counts_mature.tsv, isomir_filtered.tsv.gz
-├── 02_qc/         qc_table.tsv, qc_flags.tsv, flagged_samples.txt, qc_overview.*, composition_*
-├── 03_explore/    all/ y GRUPO/: pca, distancias, size_factors, filtered_counts
-├── 04_de/         main/ sens_mature/ sens_no_flagged/ [sens_batch/]: CONTRAST_ID/{de_results.tsv, volcano.pdf}
-│                  de_summary.tsv, concordance.tsv
-├── 05_biotype/    biotype_*.tsv, composition_*, feature_counts/, de/                [fase 2]
-├── 06_isomir/     …                                                                  [fase 3]
-├── 07_functional/ CONTRAST_ID/…                                                      [fase 3]
-├── report/        smrna_report.html
-└── pipeline_info/ params.json, software_versions.yml, execution_report.html, execution_trace.txt
+results/
+├── deliverables/                        # tablas y figuras para el wet lab
+│   ├── README.md                        # qué mirar y diccionario de columnas
+│   ├── counts/      counts_mirtop.tsv
+│   ├── qc/          qc_table.tsv, qc_flags.tsv, flagged_samples.txt,
+│   │                composition_by_sample.tsv, composition_delta.tsv, plots/
+│   ├── explore/     all/ y GRUPO/: pca.pdf, pca_coords.tsv, sample_distance_heatmap.pdf
+│   ├── de/          de_summary.tsv, concordance.tsv
+│   │                CONTRAST_ID/{de_full.tsv, de_significant.tsv, plots/volcano.pdf}
+│   ├── biotype/     biotype_*.tsv, composition_*, de/CLASE/CONTRAST_ID/…              [fase 2]
+│   ├── isomir/      isomir_profile_by_sample.tsv, isomir_counts.tsv,
+│   │                de_isomir/CONTRAST_ID/…, delta_5p_shift_*.tsv, figuras           [fase 3]
+│   ├── functional/  CONTRAST_ID/{targets.tsv, ora_up.tsv, ora_down.tsv}              [fase 3]
+│   └── report/      smrna_report.html
+├── raw/                                 # auditoría interna; no hace falta para interpretar
+│   ├── README.md
+│   ├── counts/      counts_mature.tsv, isomir_filtered.tsv.gz
+│   ├── deseq2/      GRUPO/ (dds.rds, size_factors.tsv, filtered_counts.tsv)
+│   │                sens_mature/ sens_no_flagged/ [sens_batch/]: CONTRAST_ID/{de_full.tsv, de_significant.tsv}
+│   └── biotype/     alignment_stats.tsv, feature_counts/CLASE.tsv                     [fase 2]
+└── run_info/                            # parámetros y metadatos del run
+    ├── README.md
+    ├── audit.md
+    ├── metadata_validated.csv, contrasts_validated.csv
+    ├── params_used.tsv, thresholds_used.tsv, run_manifest.tsv
+    ├── sample_index.tsv, software_versions.tsv, qa_report.tsv
+    ├── design_check/GRUPO.tsv
+    └── pipeline_info/ params.json, software_versions.yml, execution_report.html, execution_trace.txt
 ```
 
 | Pregunta | Archivo |
 | --- | --- |
-| ¿Están bien las muestras? | `02_qc/qc_overview.pdf`, `02_qc/qc_flags.tsv` |
-| ¿Cómo es la composición del small RNA? | `02_qc/composition_stacked_bar.pdf` (y `05_biotype/…`) |
-| ¿Se agrupan las muestras por biología? | `03_explore/GRUPO/pca.pdf` |
-| ¿Qué miRNAs cambian en cada contraste? | `04_de/main/CONTRAST_ID/de_results.tsv` y `volcano.pdf` |
-| ¿Es robusto el resultado? | `04_de/concordance.tsv` |
-| Resumen para compartir | `report/smrna_report.html` |
+| ¿Están bien las muestras? | `deliverables/qc/qc_overview.pdf`, `deliverables/qc/qc_flags.tsv` |
+| ¿Cómo es la composición del small RNA? | `deliverables/qc/composition_stacked_bar.pdf` (y `deliverables/biotype/…`) |
+| ¿Se agrupan las muestras por biología? | `deliverables/explore/GRUPO/pca.pdf` |
+| ¿Qué miRNAs cambian en cada contraste? | `deliverables/de/CONTRAST_ID/de_full.tsv` y `plots/volcano.pdf` |
+| ¿Cuáles son significativos? | `deliverables/de/CONTRAST_ID/de_significant.tsv` |
+| ¿Es robusto el resultado? | `deliverables/de/concordance.tsv` |
+| Trazabilidad de parámetros y umbrales | `run_info/params_used.tsv`, `run_info/thresholds_used.tsv` |
+| Resumen para compartir | `deliverables/report/smrna_report.html` |
 
-Convenciones: snake_case; TSV con cabecera, tabuladores, sin comillas y con punto decimal; `sample_id` o `contrast_id` como primera columna cuando aplique; miRNAs con nombre completo (hsa-miR-21-5p). Cambiar las columnas de una tabla de salida exige subir la versión del pipeline.
+Convenciones: snake_case; TSV con cabecera, tabuladores, sin comillas y con punto decimal; `sample_id` o `contrast_id` como primera columna cuando aplique; miRNAs con nombre completo (hsa-miR-21-5p). Cada contraste lleva `de_full.tsv` (todo lo probado) y `de_significant.tsv` (subconjunto con `padj < alpha`). Cambiar las columnas de una tabla de salida exige subir la versión del pipeline.
 
 ## 10. Hitos
 

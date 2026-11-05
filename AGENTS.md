@@ -29,7 +29,7 @@ Una orden = **un módulo**. Toca solo los ficheros que se te indiquen. No adelan
 1. **No tests.** Sin `tests/`, `test/`, `bin/tests/` ni CI de tests. La validación es una **ejecución real** sobre el batch (plan §10).
 2. **No crear carpetas ni ficheros fuera del árbol de abajo.** Si crees que hace falta uno, pregunta antes.
 3. **No añadir** `nextflow_schema.json`, `subworkflows/`, `conf/` partido ni plantilla nf-core. Este pipeline es DSL2 plano por decisión (D2).
-4. **Ningún umbral o ruta hardcodeado** en el código. Todo parámetro sale de `nextflow.config` y se vuelca a `pipeline_info/` (plan §5, D9).
+4. **Ningún umbral o ruta hardcodeado** en el código. Todo parámetro sale de `nextflow.config` y se vuelca a `run_info/pipeline_info/` (plan §5, D9).
 5. Los datos de nf-core son **de solo lectura**. Todo se escribe en `outdir`.
 6. **Nada específico del batch** en el código. Las diferencias entre muestras entran solo por `metadata.csv`, `contrasts.csv` y los flags de QC.
 7. No crear ficheros `.md` nuevos salvo petición expresa. Las decisiones largas van a `docs/internal/`.
@@ -70,7 +70,7 @@ smrna-nextflow/
     └── internal/                   # existe — papers, state_art.md, plan_idea_v1_original.md
 ```
 
-Salidas de `nextflow run` (`results_smrna/`, `work/`, `.nextflow/`) van fuera del control de versiones.
+Salidas de `nextflow run` (`results/`, `work/`, `.nextflow/`) van fuera del control de versiones. El `outdir` (`results/`) se organiza en `deliverables/` (tablas y figuras para el wet lab), `raw/` (volcados nativos de auditoría) y `run_info/` (parámetros, umbrales y `pipeline_info/`); el detalle está en `plan_idea.md` §9.
 
 ## Convenciones
 
