@@ -1,0 +1,9 @@
+# Nextflow
+.nextflow/
+work/
+results/
+
+# Private notes (local only, not versioned)
+AGENTS.md
+plan_idea.md
+docs/internal/
