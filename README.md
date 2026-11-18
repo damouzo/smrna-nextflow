@@ -15,24 +15,24 @@ nextflow run . -profile singularity,slurm -params-file params.yaml
 
 ```yaml
 # params.yaml
-nfcore_dir: /path/to/nfcore_smrnaseq/results
-metadata:   metadata.csv
-contrasts:  contrasts.csv
-outdir:     results
+nfcore_dir:  /path/to/nfcore_smrnaseq/results
+samplesheet: samplesheet.csv
+contrasts:   contrasts.csv
+outdir:      results
 ```
 
-Generic templates are in `assets/`; a working example is in `demo/batch_2026_04/`.
+Generic templates are in `assets/`; a working example (with mock fixtures) is in `demo/mock/`.
 
 ## Inputs
 
-**metadata.csv** — one row per sample.
+**samplesheet.csv** — one row per sample. It selects the subset to analyse: nf-core samples not listed here are ignored, and contrasts whose levels are missing are dropped with a warning.
 
 | column | required | description |
 | --- | --- | --- |
 | `sample_id` | yes | same name as in nf-core |
 | `condition` | yes | label used in `contrasts.csv` |
 | `norm_group` | yes | samples sharing a model and normalisation |
-| `exp`, `subject`, `library_id` | no | batch, donor, library id |
+| `batch` | no | batch (e.g. `Exp4`); the design is `~ batch + condition` per group when it has >= 2 levels |
 
 **contrasts.csv** — one row per contrast; log2FC = treatment / reference.
 
@@ -45,10 +45,12 @@ treated_vs_control,condition,control,treated,groupA
 
 | parameter | default | description |
 | --- | --- | --- |
-| `batch_col` | null | metadata column for an extra `~ batch + condition` run |
+| `batch_col` | `batch` | samplesheet column with the batch; used per group when it has >= 2 levels |
 | `count_source` | `mirtop` | `mirtop` or `mature` |
-| `alpha`, `lfc_flag` | 0.05, 1 | FDR and strong-effect log2FC threshold |
+| `alpha`, `lfc_flag` | 0.05, 1 | FDR and `sig_lfc1` log2FC threshold |
 | `run_biotype`, `run_isomir`, `run_functional` | false | enable optional modules |
+| `probe_file`, `probe_mismatches`, `probe_min_len` | null, 0, 18 | M9: probe sequences to count in the collapsed FASTA |
+| `probe_top_unknown_n` | 0 | M9: also dump the top N `unknown` sequences per sample |
 
 All defaults live in `nextflow.config`.
 
@@ -88,9 +90,10 @@ results/
 ├── deliverables/
 │   ├── README.md      what to open and the column dictionary
 │   ├── counts/        miRNA count matrices
-│   ├── qc/            QC table, flags, composition
+│   ├── qc/            QC table, flags, composition (+ plots/)
 │   ├── explore/       PCA and sample distances (per norm_group)
-│   ├── de/            DESeq2 results per contrast: de_full.tsv, de_significant.tsv
+│   ├── de/            DESeq2 per contrast: de_full.tsv, de_significant.tsv (+ plots/)
+│   ├── probes/        optional (M9): probe_summary.tsv, probe_hits.tsv, top_unknown_by_sample.tsv
 │   ├── biotype/       optional (phase 2)
 │   ├── isomir/        optional (phase 3)
 │   ├── functional/    optional (phase 3)
@@ -99,8 +102,9 @@ results/
 │   ├── counts/        counts_mature.tsv, isomir_filtered.tsv.gz
 │   ├── deseq2/        dds.rds, size_factors, filtered_counts, sensitivity runs
 │   └── biotype/       alignment_stats, feature_counts
-└── run_info/          audit.md, validated metadata, params_used, thresholds_used
+└── run_info/          audit.md, validated samplesheet, sample_index, design_check/,
+                       params_used, thresholds_used, software_versions, run_manifest, qa_report
     └── pipeline_info/ params.json, execution_report.html, execution_trace.txt
 ```
 
-Each contrast ships `de_full.tsv` (everything tested) and `de_significant.tsv` (`padj < alpha`). Sensitivity runs (`sens_mature`, `sens_no_flagged`, `sens_batch`) and intermediate objects stay in `raw/`.
+Each contrast ships `de_full.tsv` (everything tested) and `de_significant.tsv` (`padj < alpha`). Sensitivity runs (`sens_condition`, `sens_mature`, `sens_no_flagged`) and intermediate objects stay in `raw/`.

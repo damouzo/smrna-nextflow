@@ -1,0 +1,11 @@
+# smrna-nextflow — probe sequences (read probes). One row per probe: probe_id, sequence.
+#
+# sequence: DNA or RNA, any case; spaces and hyphens are ignored; U is read as T.
+# A read counts if it equals a substring of the probe (or of its reverse
+# complement) of at least probe_min_len nt, in either orientation. Pass the
+# whole hairpin or just the guide; both are handled.
+#
+# Set probe_file in params.yaml to this file (or your own). probe_mismatches is
+# 0 or 1 (default 0). Set probe_top_unknown_n > 0 to also dump the most abundant
+# 'unknown' sequences per sample.
+probe_id	sequence

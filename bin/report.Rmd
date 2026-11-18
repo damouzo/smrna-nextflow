@@ -1,0 +1,209 @@
+---
+title: "smrna-nextflow report"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+params:
+  outdir: "results"
+  run_biotype: false
+  run_isomir: false
+  run_functional: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(knitr)
+})
+
+d  <- file.path(params$outdir, "deliverables")
+ri <- file.path(params$outdir, "run_info")
+
+check <- function(...) {
+  for (p in c(...)) {
+    if (!file.exists(p)) stop(sprintf("Report input missing: %s\nPhase 1 is incomplete for this outdir.", p))
+  }
+}
+
+figure <- function(p, width = 7) {
+  if (file.exists(p)) knitr::include_graphics(p)
+  else cat(sprintf("_missing: %s_\n", p))
+}
+```
+
+# Summary
+
+```{r, results='asis'}
+check(file.path(d, "qc", "qc_table.tsv"),
+      file.path(d, "qc", "qc_flags.tsv"),
+      file.path(d, "qc", "composition_by_sample.tsv"),
+      file.path(d, "de", "de_summary.tsv"),
+      file.path(d, "de", "concordance.tsv"))
+
+qc        <- fread(file.path(d, "qc", "qc_table.tsv"))
+flags     <- fread(file.path(d, "qc", "qc_flags.tsv"))
+de_summary <- fread(file.path(d, "de", "de_summary.tsv"))
+main_sum  <- de_summary[run == "main"]
+
+cat(sprintf("- Samples: **%d** across %d norm_group(s).\n",
+            nrow(qc), uniqueN(qc$norm_group)))
+cat(sprintf("- Contrasts tested (main): **%d**.\n", nrow(main_sum)))
+cat(sprintf("- Significant miRNAs in main: **%d** up / **%d** down; **%d** with |log2FC| >= lfc_flag.\n",
+            sum(main_sum$n_up), sum(main_sum$n_down), sum(main_sum$n_sig_lfc1)))
+cat(sprintf("- Flagged samples (not excluded): **%d**.\n",
+            if (nrow(flags) > 0) uniqueN(flags$sample_id) else 0))
+```
+
+# Audit
+
+```{r, results='asis'}
+audit <- file.path(ri, "audit.md")
+if (file.exists(audit)) {
+  knitr::asis_output(paste(readLines(audit, warn = FALSE), collapse = "\n"))
+} else {
+  cat("_audit.md not found._\n")
+}
+```
+
+# QC and flags
+
+```{r}
+kable(head(qc[, .(sample_id, condition, norm_group, reads_raw, reads_passed_fastp,
+                  pct_passed, mirtrace_pct_miRNA, mirtrace_pct_tRNA, mirtrace_pct_rRNA,
+                  mirna_reads_mirtop, genome_mapped_pct)], 20), digits = 2)
+```
+
+```{r}
+if (nrow(flags) > 0) kable(flags, digits = 3) else cat("_No samples flagged._\n")
+```
+
+```{r, fig.width=8, fig.height=9}
+figure(file.path(d, "qc", "plots", "qc_overview.png"), width = 8)
+```
+
+# Composition
+
+```{r}
+kable(fread(file.path(d, "qc", "composition_by_sample.tsv")), digits = 2)
+```
+
+```{r}
+delta <- file.path(d, "qc", "composition_delta.tsv")
+if (file.exists(delta)) kable(fread(delta), digits = 2)
+```
+
+```{r, fig.width=8, fig.height=9}
+figure(file.path(d, "qc", "plots", "composition_stacked_bar.png"), width = 8)
+```
+
+# PCA and sample distances
+
+```{r}
+explore_dirs <- list.dirs(file.path(d, "explore"), recursive = FALSE)
+for (g in explore_dirs) {
+  cat(sprintf("\n\n## %s\n\n", basename(g)))
+  coords <- file.path(g, "pca_coords.tsv")
+  if (file.exists(coords)) kable(head(fread(coords), 10), digits = 3)
+  figure(file.path(g, "pca.png"), width = 6)
+  figure(file.path(g, "sample_distance_heatmap.png"), width = 6)
+}
+```
+
+# Differential expression
+
+```{r}
+kable(de_summary)
+```
+
+```{r}
+kable(fread(file.path(d, "de", "concordance.tsv")), digits = 3)
+```
+
+```{r, results='asis'}
+de_dirs <- list.dirs(file.path(d, "de"), recursive = FALSE)
+for (cdir in de_dirs) {
+  sig <- file.path(cdir, "de_significant.tsv")
+  if (!file.exists(sig)) next
+  s <- fread(sig)
+  cat(sprintf("\n\n## %s\n\n", basename(cdir)))
+  if (nrow(s) > 0) {
+    print(kable(head(s[order(padj)][, .(mirna, log2FC_shrunk, padj, direction, sig_lfc1)], 20), digits = 3))
+  } else {
+    cat("_No significant miRNAs._\n")
+  }
+}
+```
+
+```{r}
+for (cdir in list.dirs(file.path(d, "de"), recursive = FALSE)) {
+  v <- file.path(cdir, "plots", "volcano.png")
+  if (file.exists(v)) figure(v, width = 6)
+}
+```
+
+# isomiRs
+
+```{r, results='asis'}
+if (isTRUE(params$run_isomir) && dir.exists(file.path(d, "isomir"))) {
+  f <- file.path(d, "isomir", "isomir_profile_by_sample.tsv")
+  if (file.exists(f)) kable(head(fread(f), 30), digits = 3) else cat("_isomiR tables not found._\n")
+} else {
+  cat("_Phase 3 (isomiRs) not enabled or not available._\n")
+}
+```
+
+# Functional enrichment
+
+```{r, results='asis'}
+if (isTRUE(params$run_functional) && dir.exists(file.path(d, "functional"))) {
+  cats <- list.dirs(file.path(d, "functional"), recursive = FALSE)
+  for (cdir in cats) {
+    cat(sprintf("\n\n## %s\n\n", basename(cdir)))
+    for (f in c("ora_up.tsv", "ora_down.tsv")) {
+      p <- file.path(cdir, f)
+      if (file.exists(p)) { cat(sprintf("**%s**\n\n", f)); print(kable(head(fread(p), 20), digits = 3)) }
+    }
+  }
+} else {
+  cat("_Phase 3 (functional) not enabled or not available._\n")
+}
+```
+
+# Read probes
+
+```{r, results='asis'}
+pf <- file.path(d, "probes")
+if (dir.exists(pf)) {
+  s <- file.path(pf, "probe_summary.tsv")
+  if (file.exists(s)) {
+    cat("**probe_summary.tsv**\n\n")
+    print(kable(head(fread(s), 40), digits = 3))
+  }
+  u <- file.path(pf, "top_unknown_by_sample.tsv")
+  if (file.exists(u)) {
+    cat("\n\n**top_unknown_by_sample.tsv** (most abundant 'unknown' reads per sample)\n\n")
+    print(kable(head(fread(u), 20), digits = 3))
+  }
+} else {
+  cat("_No probe file provided (read probes disabled)._\n")
+}
+```
+
+# Methods
+
+- Counts are split 1/k across their miRNAs for multi-assigned reads, then rounded.
+- Differential expression: DESeq2 per `norm_group`. Main model `~ batch + condition` when the group has at least 2 batch levels, else `~ condition`; sensitivities: `sens_condition`, `sens_mature`, `sens_no_flagged`.
+- log2FC = treatment / reference; positive means more abundant in `treatment`.
+- `sig_lfc1` flags `padj < alpha` and `|log2FC_shrunk| >= lfc_flag`.
+- Expression filter: CPM >= `min_cpm` in at least the smallest level of the group and total count >= `min_total_count`.
+
+# Limitations
+
+- Composition percentages are relative to the small RNA content of each sample; they are compositional, not absolute.
+- DE is relative to the total miRNA fraction, not absolute abundance.
+- Only fragments derived from snoRNA are captured by this library.
+- Small n; interpret per-contrast results with care.

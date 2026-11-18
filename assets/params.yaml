@@ -1,0 +1,30 @@
+# smrna-nextflow — per-run parameters. Copy and edit; pass with -params-file.
+# Paths may be absolute or relative to the launch directory.
+
+# nf-core/smrnaseq results/ directory (read-only).
+nfcore_dir: null
+
+# Input tables.
+samplesheet: null
+contrasts:   null
+
+# Output root: deliverables/, raw/, run_info/.
+outdir: results
+
+# samplesheet column with the batch (e.g. Exp4). The design is chosen per group:
+# ~ batch + condition when the group has >= 2 batch levels, else ~ condition.
+# Leave the column empty for the groups without a batch (e.g. donors).
+batch_col: batch
+
+# Optional phases.
+run_biotype:    false   # phase 2: full biotype composition
+run_isomir:     false   # phase 3: isomiR profile
+run_functional: false   # phase 3: miRNA target enrichment
+
+# Read probes (optional): set probe_file to a probes.tsv and/or
+# probe_top_unknown_n > 0 to count reads derived from given constructs.
+probe_file: null
+probe_mismatches: 0
+probe_min_len: 18
+probe_top_unknown_n: 0
+probe_top_hits_n: 20

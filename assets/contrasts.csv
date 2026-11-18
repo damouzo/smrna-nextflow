@@ -1,0 +1,2 @@
+contrast_id,variable,reference,treatment,norm_group
+GROUP_A_treated_vs_control,condition,Control,Treated,GROUP_A
